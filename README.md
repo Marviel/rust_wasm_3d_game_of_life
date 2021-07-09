@@ -1,6 +1,6 @@
 <div align="center">
 
-  <h1><code>wasm_game_of_life</code></h1>
+  <h1><code>wasm_game_of_life</code> -- The 3D Fork 🍴 </h1>
 
   <strong>Conway's Game of Life in Rust and WebAssembly</strong>
 
