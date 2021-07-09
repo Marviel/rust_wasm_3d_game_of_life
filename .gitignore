@@ -3,3 +3,5 @@ target/
 wasm-pack.log
 Cargo.lock
 www/dist/
+*/.DS_Store
+.DS_Store
