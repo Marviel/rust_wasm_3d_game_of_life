@@ -1,23 +1,66 @@
-import { Universe, Cell } from "wasm-game-of-life";
+import { Universe3D, Cell } from "wasm-game-of-life";
 import { memory } from "wasm-game-of-life/wasm_game_of_life_bg";
+import { OrbitControls } from "three";
+import * as THREE from 'three'
+import { Color } from "three";
 
-const CELL_SIZE = 5; // px
+const CELL_SIZE = 2; // px
 const GRID_COLOR = "#CCCCCC";
 const DEAD_COLOR = "#FFFFFF";
 const ALIVE_COLOR = "#000000";
 
 // Construct the universe, and get its width and height.
-const universe = Universe.new();
+const universe = Universe3D.new();
 const width = universe.width();
 const height = universe.height();
+const depth = universe.depth();
 
 // Give the canvas room for all of our cells and a 1px border
 // around each of them.
 const canvas = document.getElementById("game-of-life-canvas");
+const rootDiv = document.getElementById("three-stuff")
 canvas.height = (CELL_SIZE + 1) * height + 1;
 canvas.width = (CELL_SIZE + 1) * width + 1;
 
 const ctx = canvas.getContext('2d');
+
+const threeRenderer = new THREE.WebGLRenderer({antialias: true});
+threeRenderer.domElement.width = 600;
+threeRenderer.domElement.height = 500;
+threeRenderer.setViewport(0, 0, 600, 500)
+const threeScene = new THREE.Scene();
+const threeCamera = new THREE.PerspectiveCamera();
+threeScene.background = new THREE.Color("white")
+const controls = new OrbitControls(threeCamera, threeRenderer.domElement)
+threeCamera.position.set(height / 2, width / 2, 50)
+threeCamera.lookAt(height / 2, width / 2, 0);
+
+
+console.log("creating cubes", height, width, depth)
+const cubeRows = new Array();
+for(var i = 0; i < height; i++){
+  const cubeCol = new Array();
+  for (var j = 0; j < width; j++){
+    const cubeRow = new Array();
+    for (var k = 0; k < depth; k++){
+      const cubeGeo = new THREE.BoxBufferGeometry(.5, .5, .5);
+      const cubeMesh = new THREE.Mesh(cubeGeo, new THREE.MeshBasicMaterial({color: "purple"}));
+      cubeMesh.position.set(i, j, k);
+
+      threeScene.add(cubeMesh);
+      cubeRow.push(cubeMesh);
+    }
+    cubeCol.push(cubeRow)
+  }
+  cubeRows.push(cubeCol)
+}
+console.log("cubes created")
+
+
+rootDiv.appendChild(threeRenderer.domElement);
+
+threeRenderer.render(threeScene, threeCamera)
+  
 
 const fps = new class {
   constructor() {
@@ -67,8 +110,12 @@ let animationId = null;
 const renderLoop = () => {
   fps.render();
 
-  drawGrid();
-  drawCells();
+  controls.update();
+  drawGridThree();
+  drawCellsThree();
+  // drawGridCanvas();
+  // drawCellsCanvas();
+  threeRenderer.render(threeScene, threeCamera)
 
   for (let i = 0; i < 9; i++) {
     universe.tick();
@@ -102,7 +149,12 @@ playPauseButton.addEventListener("click", event => {
   }
 });
 
-const drawGrid = () => {
+
+const drawGridThree = () => {
+  // no op
+}
+
+const drawGridCanvas = () => {
   ctx.beginPath();
   ctx.strokeStyle = GRID_COLOR;
 
@@ -121,11 +173,52 @@ const drawGrid = () => {
   ctx.stroke();
 };
 
-const getIndex = (row, column) => {
-  return row * width + column;
+const getIndex = (row, column, lan) => {
+  return row * width + column * height + lan;
 };
 
-const drawCells = () => {
+console.log(cubeRows[0][0][0].material.color)
+
+
+const blue = new Color("blue");
+const purple = new Color("purple");
+const orange = new Color("orange");
+const red = new Color("red");
+
+const drawCellsThree = () => {
+  const cellsPtr = universe.cells();
+  const cells = new Uint8Array(memory.buffer, cellsPtr, width * height);
+  const adjacentCountsPtr = universe.adjacent_counts();
+  const adjacentCounts = new Uint8Array(memory.buffer, cellsPtr, width * height);
+  
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      for (let lan = 0; lan < depth; lan++){
+        const idx = getIndex(row, col, lan);
+        if (cells[idx] !== Cell.Alive) {
+          cubeRows[row][col][lan].visible = false;
+          continue;
+        }
+        else { 
+          // console.log(adjacentCounts[idx])
+          cubeRows[row][col][lan].material.color = 
+            adjacentCounts[idx] === 1 ? 
+              blue : 
+              (adjacentCounts[idx] === 2 ?
+                purple :
+                (adjacentCounts[idx] === 3 ?
+                  orange :
+                  red
+                )
+              )
+          cubeRows[row][col][lan].visible = true;
+        }
+      }
+    }
+  } 
+}
+
+const drawCellsCanvas = () => {
   const cellsPtr = universe.cells();
   const cells = new Uint8Array(memory.buffer, cellsPtr, width * height);
 
@@ -184,8 +277,8 @@ canvas.addEventListener("click", event => {
 
   universe.toggle_cell(row, col);
 
-  drawCells();
-  drawGrid();
+  drawCellsCanvas();
+  drawGridCanvas();
 });
 
 play();
